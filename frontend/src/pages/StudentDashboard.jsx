@@ -10,10 +10,6 @@ export default function StudentDashboard() {
   const [sessionsMentorCount, setSessionsMentorCount] = useState(0);
 
   useEffect(() => {
-    api.get("/api/auth/me").then((r) => updateUser(r.data)).catch(() => {});
-  }, [updateUser]);
-
-  useEffect(() => {
     if (!user) return;
     api
       .get("/api/skills/my")

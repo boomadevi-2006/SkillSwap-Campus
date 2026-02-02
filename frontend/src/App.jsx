@@ -11,10 +11,14 @@ import SessionRequests from "./pages/SessionRequests";
 import Chat from "./pages/Chat";
 import AdminDashboard from "./pages/AdminDashboard";
 import Leaderboard from "./pages/Leaderboard";
+import Notifications from "./pages/Notifications";
 
 function HomeRedirect() {
   const { user } = useAuth();
-  return <Navigate to={user?.role === "admin" ? "/admin" : "/dashboard"} replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  return <Navigate to={user.role === "admin" ? "/admin" : "/dashboard"} replace />;
 }
 
 function PrivateRoute({ children, studentOnly, adminOnly }) {
@@ -53,6 +57,7 @@ export default function App() {
         <Route path="chat" element={<PrivateRoute studentOnly><Chat /></PrivateRoute>} />
         <Route path="chat/:sessionId" element={<PrivateRoute studentOnly><Chat /></PrivateRoute>} />
         <Route path="leaderboard" element={<PrivateRoute studentOnly><Leaderboard /></PrivateRoute>} />
+        <Route path="notifications" element={<PrivateRoute studentOnly><Notifications /></PrivateRoute>} />
         <Route path="admin" element={<PrivateRoute adminOnly><AdminDashboard /></PrivateRoute>} />
         <Route path="admin/students" element={<PrivateRoute adminOnly><AdminDashboard tab="students" /></PrivateRoute>} />
         <Route path="admin/skills" element={<PrivateRoute adminOnly><AdminDashboard tab="skills" /></PrivateRoute>} />

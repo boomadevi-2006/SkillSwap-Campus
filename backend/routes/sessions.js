@@ -4,6 +4,7 @@ const Session = require('../models/Session');
 const Skill = require('../models/Skill');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const Notification = require('../models/Notification');
 
 const router = express.Router();
 const POINTS_PER_SESSION = 10;
@@ -106,6 +107,63 @@ router.patch('/:id', auth, async (req, res) => {
       .populate('learnerId', 'name email')
       .populate('skillId', 'title category');
     res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Request completion (mentor sends prompt to learner)
+router.post('/:id/request-completion', auth, async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.id).populate('skillId', 'title');
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    const isMentor = session.mentorId.toString() === req.user._id.toString();
+    if (!isMentor) return res.status(403).json({ error: 'Only mentor can request completion' });
+    if (session.status !== 'accepted') {
+      return res.status(400).json({ error: 'Only accepted sessions can request completion' });
+    }
+    const message = `Please confirm completion for "${session.skillId?.title || 'session'}"`;
+    const notif = new Notification({
+      userId: session.learnerId,
+      type: 'completion_request',
+      message,
+      relatedId: session._id,
+    });
+    await notif.save();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Learner confirms completion
+router.post('/:id/confirm-completion', auth, async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    const isLearner = session.learnerId.toString() === req.user._id.toString();
+    if (!isLearner) return res.status(403).json({ error: 'Only learner can confirm completion' });
+    if (session.status !== 'completed') {
+      session.status = 'completed';
+      await User.findByIdAndUpdate(session.mentorId, { $inc: { points: POINTS_PER_SESSION } });
+      await session.save();
+    }
+    await Notification.deleteMany({ userId: req.user._id, relatedId: session._id, type: 'completion_request' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Learner declines completion
+router.post('/:id/decline-completion', auth, async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    const isLearner = session.learnerId.toString() === req.user._id.toString();
+    if (!isLearner) return res.status(403).json({ error: 'Only learner can decline completion' });
+    await Notification.deleteMany({ userId: req.user._id, relatedId: session._id, type: 'completion_request' });
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
